@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NiceRx - Attendance Tool</title>
+  <!-- Google Fonts - Karla (as requested) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Background decorative elements -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+
+  <!-- Notification Banner -->
+  <div id="notification" class="notification hidden">
+    <span id="notification-message">Notification message here</span>
+    <button id="notification-close" class="close-btn">&times;</button>
+  </div>
+
+  <!-- ================= AUTH CONTAINER ================= -->
+  <div id="auth-container" class="auth-container">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <span class="text-navy font-bold">Nice<span class="text-orange">Rx</span></span>
+        <div class="auth-logo-sub">Attendance Tool</div>
+      </div>
+
+      <!-- Login Page Clocks -->
+      <div class="auth-clocks-panel font-karla">
+        <div class="auth-clock-item">
+          <span class="auth-tz-lbl">IST (India)</span>
+          <span id="auth-ist-clock" class="auth-clock-val">00:00:00</span>
+        </div>
+        <div class="auth-clock-item">
+          <span class="auth-tz-lbl">EST (US)</span>
+          <span id="auth-est-clock" class="auth-clock-val">00:00:00</span>
+        </div>
+      </div>
+      
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form active">
+        <h2 class="form-title">Agent Log In</h2>
+        <div class="form-group">
+          <label for="login-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
+          <input type="email" id="login-email" required placeholder="name@nicerx.com">
+        </div>
+        <div class="form-group">
+          <label for="login-password"><i class="fa-solid fa-lock"></i> Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="login-password" required placeholder="••••••••">
+            <i class="fa-solid fa-eye toggle-password" data-target="login-password"></i>
+          </div>
+          <div class="forgot-link-row">
+            <a href="#" id="toggle-to-reset" class="auth-link">Forgot Password?</a>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <span class="btn-text">Sign In</span>
+          <i class="fa-solid fa-right-to-bracket"></i>
+        </button>
+        <p class="form-toggle-text">Need to register? <a href="#" id="toggle-to-signup">Register here</a></p>
+      </form>
+
+      <!-- Reset Password Form -->
+      <form id="reset-form" class="auth-form">
+        <h2 class="form-title">Password Reset</h2>
+        <p class="config-desc" style="margin-bottom: 15px; font-size: 0.82rem; text-align: center;">
+          Validate your registered Date of Birth to set a new password.
+        </p>
+        <div class="form-group">
+          <label for="reset-email"><i class="fa-solid fa-envelope"></i> Registered Email</label>
+          <input type="email" id="reset-email" required placeholder="name@nicerx.com">
+        </div>
+        <div class="form-group">
+          <label for="reset-birthday"><i class="fa-solid fa-cake-candles"></i> Date of Birth (Verification)</label>
+          <input type="date" id="reset-birthday" required>
+        </div>
+        <div class="form-group">
+          <label for="reset-new-password"><i class="fa-solid fa-lock"></i> New Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="reset-new-password" required placeholder="••••••••">
+            <i class="fa-solid fa-eye toggle-password" data-target="reset-new-password"></i>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="reset-confirm-password"><i class="fa-solid fa-lock"></i> Confirm New Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="reset-confirm-password" required placeholder="••••••••">
+            <i class="fa-solid fa-eye toggle-password" data-target="reset-confirm-password"></i>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <span class="btn-text">Reset Password</span>
+          <i class="fa-solid fa-key"></i>
+        </button>
+        <p class="form-toggle-text">Remember password? <a href="#" id="toggle-reset-to-login">Sign In</a></p>
+      </form>
+
+      <!-- Signup Form -->
+      <form id="signup-form" class="auth-form">
+        <h2 class="form-title">Agent Registration</h2>
+        <div class="form-group">
+          <label for="signup-name"><i class="fa-solid fa-user"></i> Full Name</label>
+          <input type="text" id="signup-name" required placeholder="Jane Doe">
+        </div>
+        <div class="form-group">
+          <label for="signup-email"><i class="fa-solid fa-envelope"></i> Email Address</label>
+          <input type="email" id="signup-email" required placeholder="name@nicerx.com">
+        </div>
+        <div class="form-group">
+          <label for="signup-birthday"><i class="fa-solid fa-cake-candles"></i> Date of Birth</label>
+          <input type="date" id="signup-birthday" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group col">
+            <label for="signup-slot"><i class="fa-solid fa-business-time"></i> Shift Slot</label>
+            <select id="signup-slot" required>
+              <option value="8:30 AM EST">8:30 AM EST (India Evening Shift)</option>
+              <option value="10:00 AM EST">10:00 AM EST (India Night Shift)</option>
+            </select>
+          </div>
+          <div class="form-group col">
+            <label for="signup-role"><i class="fa-solid fa-user-shield"></i> Role</label>
+            <select id="signup-role" required>
+              <option value="Employee">Agent</option>
+              <option value="Admin">HR Administrator</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signup-password"><i class="fa-solid fa-lock"></i> Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="signup-password" required placeholder="••••••••">
+            <i class="fa-solid fa-eye toggle-password" data-target="signup-password"></i>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signup-confirm-password"><i class="fa-solid fa-lock"></i> Confirm Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="signup-confirm-password" required placeholder="••••••••">
+            <i class="fa-solid fa-eye toggle-password" data-target="signup-confirm-password"></i>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <span class="btn-text">Register Account</span>
+          <i class="fa-solid fa-user-plus"></i>
+        </button>
+        <p class="form-toggle-text">Already registered? <a href="#" id="toggle-to-login">Sign In</a></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= APP CONTAINER ================= -->
+  <div id="app-container" class="app-container hidden">
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+      <div class="nav-left">
+        <div class="nav-logo">
+          <span class="text-navy font-bold">Nice<span class="text-orange">Rx</span></span>
+          <span class="nav-logo-sub">Attendance Tool</span>
+        </div>
+      </div>
+      
+      <div class="nav-right">
+        <!-- Google Sheet Config Button -->
+        <button id="config-btn" class="btn btn-secondary" title="Google Sheet Integration">
+          <i class="fa-solid fa-database"></i>
+          <span class="hide-mobile">Database</span>
+        </button>
+        
+        <div class="user-profile-badge">
+          <div class="avatar-icon">
+            <i class="fa-solid fa-user-tie"></i>
+          </div>
+          <div class="user-meta hide-mobile">
+            <div id="navbar-username" class="user-name">Loading...</div>
+            <div id="navbar-role" class="user-role">Agent</div>
+          </div>
+        </div>
+        
+        <button id="logout-btn" class="btn btn-danger btn-circle" title="Sign Out">
+          <i class="fa-solid fa-power-off"></i>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Configuration Modal (Google Sheet URL) -->
+    <div id="config-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-database text-teal"></i> Google Sheet Connection</h3>
+          <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <p class="config-desc">
+            Connect NiceRx Attendance Tool to your Google Sheet database. If left empty, it runs in 
+            <strong class="text-orange">Local Sandbox (offline)</strong> mode.
+          </p>
+          <div class="form-group">
+            <label for="config-url">Google Apps Script Web App URL</label>
+            <input type="url" id="config-url" placeholder="https://script.google.com/macros/s/.../exec">
+            <small class="help-text">Paste the Web App deployment link generated in Google Apps Script.</small>
+          </div>
+          <div class="mode-indicator-panel">
+            <span>Connection Status:</span>
+            <span id="connection-status-badge" class="badge badge-offline">Offline Sandbox</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="save-config-btn" class="btn btn-primary">Connect Backend</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="export-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-file-export text-teal"></i> Export Attendance Details</h3>
+          <span id="close-export-modal" class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body font-karla">
+          <div class="form-group">
+            <label for="export-agent-select">Select Agent</label>
+            <select id="export-agent-select" required>
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="export-mode-select">Selection Period Mode</label>
+            <select id="export-mode-select">
+              <option value="month">By Month / Multi-Month</option>
+              <option value="daterange">By Custom Date Range</option>
+            </select>
+          </div>
+
+          <!-- Month Selection Controls -->
+          <div id="export-month-controls" class="form-row">
+            <div class="form-group col">
+              <label for="export-year-select">Year</label>
+              <select id="export-year-select"></select>
+            </div>
+            <div class="form-group col">
+              <label for="export-start-month">From Month</label>
+              <select id="export-start-month">
+                <option value="0">January</option>
+                <option value="1">February</option>
+                <option value="2">March</option>
+                <option value="3">April</option>
+                <option value="4">May</option>
+                <option value="5">June</option>
+                <option value="6">July</option>
+                <option value="7">August</option>
+                <option value="8">September</option>
+                <option value="9">October</option>
+                <option value="10">November</option>
+                <option value="11">December</option>
+              </select>
+            </div>
+            <div class="form-group col">
+              <label for="export-end-month">To Month</label>
+              <select id="export-end-month">
+                <option value="0">January</option>
+                <option value="1">February</option>
+                <option value="2">March</option>
+                <option value="3">April</option>
+                <option value="4">May</option>
+                <option value="5">June</option>
+                <option value="6">July</option>
+                <option value="7">August</option>
+                <option value="8">September</option>
+                <option value="9">October</option>
+                <option value="10">November</option>
+                <option value="11">December</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Date Range Controls -->
+          <div id="export-daterange-controls" class="form-row hidden">
+            <div class="form-group col">
+              <label for="export-start-date">Start Date</label>
+              <input type="date" id="export-start-date">
+            </div>
+            <div class="form-group col">
+              <label for="export-end-date">End Date</label>
+              <input type="date" id="export-end-date">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-trigger-export" class="btn btn-primary">Download Report (CSV)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Grid Dashboard Content -->
+    <main class="dashboard-main">
+      
+      <!-- FIRST ROW: CLOCK, BREAKS, AND LEAVE BALANCES -->
+      <section class="grid-layout cols-3">
+        <!-- Punch & Timezones Card -->
+        <article class="card main-clocking-card">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-clock text-orange"></i> Shift Clocks</h3>
+            <span id="shift-badge" class="badge badge-offline">Offline</span>
+          </div>
+          
+          <div class="clocks-dual-grid">
+            <div class="clock-panel main-ist">
+              <span class="timezone-label">IST (India Time)</span>
+              <div id="dashboard-clock" class="digital-clock">00:00:00</div>
+              <div id="dashboard-date" class="digital-date">Tuesday, August 4, 2026</div>
+            </div>
+            <div class="clock-panel secondary-est">
+              <span class="timezone-label">EST (Client Time)</span>
+              <div id="est-clock" class="est-digital-clock">00:00:00 EST</div>
+            </div>
+          </div>
+
+          <div class="shift-state-details">
+            <div class="state-indicator-row">
+              <span class="state-label">Status:</span>
+              <span id="shift-status-text" class="status-value text-muted">Out of Shift</span>
+            </div>
+            <div class="state-indicator-row" style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <span class="state-label">Assigned Slot:</span>
+                <span id="user-shift-slot" class="status-value font-bold text-navy">-</span>
+              </div>
+              <button id="btn-swap-shift" class="btn btn-secondary" style="height: 28px; padding: 2px 10px; font-size: 0.75rem;">
+                <i class="fa-solid fa-repeat"></i> Swap Shift
+              </button>
+            </div>
+            <div class="active-timers">
+              <div class="timer-box">
+                <span class="timer-lbl">Active Work Time</span>
+                <span id="shift-timer" class="timer-val">00:00:00</span>
+              </div>
+              <div class="timer-box">
+                <span class="timer-lbl">Break Time Used</span>
+                <span id="break-timer" class="timer-val">00:00:00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="clocking-actions">
+            <button id="btn-punch" class="btn btn-punch btn-success">
+              <i class="fa-solid fa-fingerprint"></i>
+              <span id="btn-punch-text">Punch In</span>
+            </button>
+          </div>
+        </article>
+
+        <!-- NiceRx Break Management -->
+        <article class="card breaks-card">
+          <h3><i class="fa-solid fa-mug-hot text-teal"></i> NiceRx Break Manager</h3>
+          <p class="break-intro-text">Select your break type. Unlocked after 2 hours of shift duration.</p>
+          
+          <div class="break-controls-row">
+            <select id="break-type-select" disabled>
+              <option value="Tea Break 1">Tea Break 1 (15 Mins)</option>
+              <option value="Dinner Break">Dinner Break (30 Mins)</option>
+              <option value="Tea Break 2">Tea Break 2 (15 Mins)</option>
+              <option value="Bio Break">Bio Break (5 Mins, Max 2)</option>
+            </select>
+            <button id="btn-break" class="btn btn-break btn-secondary" disabled>
+              <span id="btn-break-text">Start Break</span>
+            </button>
+          </div>
+
+          <div class="break-allocation-list">
+            <h4>Break Details Today</h4>
+            <div class="break-limit-item" id="limit-tea1">
+              <span>Tea Break 1 (Max 15m)</span>
+              <span class="break-used-badge" id="used-tea1">Used: 0m</span>
+            </div>
+            <div class="break-limit-item" id="limit-dinner">
+              <span>Dinner Break (Max 30m)</span>
+              <span class="break-used-badge" id="used-dinner">Used: 0m</span>
+            </div>
+            <div class="break-limit-item" id="limit-tea2">
+              <span>Tea Break 2 (Max 15m)</span>
+              <span class="break-used-badge" id="used-tea2">Used: 0m</span>
+            </div>
+            <div class="break-limit-item" id="limit-bio">
+              <span>Bio Breaks (Max 2, 5m each)</span>
+              <span class="break-used-badge" id="used-bio">Count: 0/2 (0m)</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Leave Balance Display Card (Replaces generic policy widget) -->
+        <article class="card leave-balances-card">
+          <h3><i class="fa-solid fa-wallet text-orange"></i> Agent Leave Balance</h3>
+          <p class="card-intro">NiceRx annual leave allocations (April to March Fiscal Year).</p>
+          
+          <div class="leave-balance-grid">
+            <!-- Earned Leave box -->
+            <div class="leave-balance-box font-karla">
+              <span class="leave-box-title">Earned Leaves (EL)</span>
+              <div class="leave-box-numbers">
+                <div class="lbl-num"><span class="num-lbl">Total</span><span id="bal-el-avail" class="num-val">15</span></div>
+                <div class="lbl-num"><span class="num-lbl">Used</span><span id="bal-el-used" class="num-val">0</span></div>
+                <div class="lbl-num"><span class="num-lbl">Remaining</span><span id="bal-el-rem" class="num-val-highlight">15</span></div>
+              </div>
+            </div>
+
+            <!-- Sick Leave box -->
+            <div class="leave-balance-box font-karla">
+              <span class="leave-box-title">Sick Leaves (SL)</span>
+              <div class="leave-box-numbers">
+                <div class="lbl-num"><span class="num-lbl">Total</span><span id="bal-sl-avail" class="num-val">6.5</span></div>
+                <div class="lbl-num"><span class="num-lbl">Used</span><span id="bal-sl-used" class="num-val">0</span></div>
+                <div class="lbl-num"><span class="num-lbl">Remaining</span><span id="bal-sl-rem" class="num-val-highlight">6.5</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="leave-terms-summary">
+            <small>* EL credits 1 day per 11 days worked. Cancelled if leaves exceed 2 in a month.</small>
+            <small>* SL credits 0.5 days per month, rolling over to the next month.</small>
+          </div>
+        </article>
+      </section>
+
+      <!-- SECOND ROW: LEAVE FORMS & SYSTEM PERFORMANCE SUMMARY BOARD -->
+      <section class="grid-layout cols-2">
+        <!-- Leave Requests Application -->
+        <article class="card">
+          <div class="card-header-flex">
+            <h3><i class="fa-solid fa-plane-departure text-orange"></i> Request Time Off</h3>
+            <span class="leave-balance-badge bg-azure text-navy">Leave Policy Enforced</span>
+          </div>
+
+          <div class="leave-grid-layout">
+            <form id="leave-form" class="sub-form">
+              <div class="form-row">
+                <div class="form-group col">
+                  <label for="leave-type">Leave Category</label>
+                  <select id="leave-type" required>
+                    <option value="Earned Leave (EL)">Earned Leave (EL)</option>
+                    <option value="Sick Leave (SL)">Sick Leave (SL)</option>
+                    <option value="Half-day sick leave (HDSL)">Half-day sick leave (HDSL)</option>
+                    <option value="Half-day leave without pay (HDLWP)">Half-day leave without pay (HDLWP)</option>
+                    <option value="Leave Without Pay (LWP)">Leave Without Pay (LWP)</option>
+                    <option value="Maternity Leave (MTL)">Maternity Leave (MTL)</option>
+                    <option value="Hospital Leave (HL)">Hospital Leave (HL)</option>
+                    <option value="Optional Holiday (OH)">Optional Holiday (OH)</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group col">
+                  <label for="leave-start">Start Date</label>
+                  <input type="date" id="leave-start" required>
+                </div>
+                <div class="form-group col">
+                  <label for="leave-end">End Date</label>
+                  <input type="date" id="leave-end" required>
+                </div>
+              </div>
+
+              <!-- Hospital Leave Upload Checkbox -->
+              <div class="form-group hidden" id="hospital-doc-group">
+                <label class="checkbox-container">
+                  <input type="checkbox" id="hospital-doc-submitted">
+                  <span><i class="fa-solid fa-square-check text-teal"></i> Hospitalization documents submitted for approval</span>
+                </label>
+              </div>
+
+              <div class="form-group">
+                <label for="leave-reason">Reason / Comments</label>
+                <textarea id="leave-reason" rows="2" placeholder="Describe the reason for applying..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block">Apply Leave</button>
+            </form>
+
+            <div class="leave-history-panel">
+              <h4>My Applications</h4>
+              <div class="table-container list-view scrollable">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Dates</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="my-leaves-body">
+                    <tr><td colspan="4" class="empty-placeholder">No leaves recorded.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- System Performance Board (Leaderboard) -->
+        <article class="card summary-board-card">
+          <h3><i class="fa-solid fa-medal text-orange"></i> NiceRx Agent Summary Board</h3>
+          <p class="card-intro">Recognizing NiceRx agents with exceptional compliance and attendance records.</p>
+          
+          <div class="leaderboard-grid">
+            <!-- Best Attendance section -->
+            <div class="leaderboard-card">
+              <span class="leaderboard-title"><i class="fa-solid fa-calendar-check text-teal"></i> 100% Attendance Compliance</span>
+              <div class="leaderboard-ranks">
+                <div class="rank-item">
+                  <span class="rank-lbl">Month</span>
+                  <span class="rank-val" id="best-att-month">No data</span>
+                </div>
+                <div class="rank-item">
+                  <span class="rank-lbl">Quarter</span>
+                  <span class="rank-val" id="best-att-quarter">No data</span>
+                </div>
+                <div class="rank-item">
+                  <span class="rank-lbl">Half-Yearly</span>
+                  <span class="rank-val" id="best-att-half">No data</span>
+                </div>
+                <div class="rank-item">
+                  <span class="rank-lbl">Yearly</span>
+                  <span class="rank-val" id="best-att-year">No data</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Best Logins section -->
+            <div class="leaderboard-card">
+              <span class="leaderboard-title"><i class="fa-solid fa-user-clock text-orange"></i> Punctuality (No Late Logins)</span>
+              <div class="leaderboard-ranks single-rank">
+                <div class="rank-item">
+                  <span class="rank-lbl">Current Month</span>
+                  <span class="rank-val" id="best-punctual-month">No data</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Best Breaks section -->
+            <div class="leaderboard-card">
+              <span class="leaderboard-title"><i class="fa-solid fa-circle-check text-blue"></i> Compliance (No Exceeded Breaks)</span>
+              <div class="leaderboard-ranks single-rank">
+                <div class="rank-item">
+                  <span class="rank-lbl">Current Month</span>
+                  <span class="rank-val" id="best-breaks-month">No data</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <!-- THIRD ROW: HISTORIES & HOLIDAYS -->
+      <section class="grid-layout cols-2">
+        <!-- Attendance History -->
+        <article class="card">
+          <h3><i class="fa-solid fa-list-check text-teal"></i> My Attendance & Shift History</h3>
+          <div class="table-container main-history scrollable">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Shift Slot</th>
+                  <th>Clock In (IST)</th>
+                  <th>Clock Out (IST)</th>
+                  <th>Hours Worked</th>
+                  <th>Break Mins</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-history-body">
+                <tr><td colspan="7" class="empty-placeholder">No shifts logged yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- Client Holidays & Birthday Reminders -->
+        <article class="card reminders-card">
+          <div class="tab-headers">
+            <button id="tab-birthdays" class="tab-btn active"><i class="fa-solid fa-cake-candles"></i> Team Birthdays</button>
+            <button id="tab-holidays" class="tab-btn"><i class="fa-solid fa-calendar-day"></i> Client Holidays (US)</button>
+          </div>
+          <div class="tab-content scrollable">
+            <ul id="birthdays-list" class="reminders-list active">
+              <li class="empty-list-placeholder">No birthdays loaded.</li>
+            </ul>
+            <ul id="holidays-list" class="reminders-list">
+              <li class="empty-list-placeholder">No client holidays loaded.</li>
+            </ul>
+          </div>
+        </article>
+      </section>
+
+      <!-- ADMIN DASHBOARD PANEL (HIDDEN IF NOT ADMIN) -->
+      <section id="admin-panel" class="grid-layout cols-1 hidden admin-panel-sec">
+        <article class="card admin-card">
+          <div class="admin-header">
+            <h3><i class="fa-solid fa-user-shield text-navy"></i> HR Administrative CRM Dashboard</h3>
+            <div class="admin-header-actions" style="display: flex; align-items: center; gap: 12px;">
+              <button id="admin-export-btn" class="btn btn-secondary" style="height: 32px; padding: 4px 12px; font-size: 0.8rem;">
+                <i class="fa-solid fa-file-export"></i> Export Report
+              </button>
+              <span class="badge badge-admin">Admin Dashboard</span>
+            </div>
+          </div>
+
+          <div class="admin-grid-tabs">
+            <div class="admin-tab-headers">
+              <button id="admin-tab-leaves" class="admin-tab-btn active"><i class="fa-solid fa-envelope-open-text"></i> Leave Requests</button>
+              <button id="admin-tab-attendance" class="admin-tab-btn"><i class="fa-solid fa-clock-rotate-left"></i> Team Attendance Logs</button>
+            </div>
+            
+            <div class="admin-tabs-content">
+              <!-- Admin Leave Requests -->
+              <div id="admin-leaves-content" class="admin-pane active">
+                <div class="table-container scrollable">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Agent</th>
+                        <th>Type</th>
+                        <th>Dates</th>
+                        <th>Reason</th>
+                        <th>Docs Submitted</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="admin-leaves-body">
+                      <tr><td colspan="7" class="empty-placeholder">No leaves pending.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Admin Attendance Logs -->
+              <div id="admin-attendance-content" class="admin-pane">
+                <div class="table-container scrollable">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th>Agent</th>
+                        <th>Date</th>
+                        <th>Slot</th>
+                        <th>Clock In (IST)</th>
+                        <th>Clock Out (IST)</th>
+                        <th>Hours Worked</th>
+                        <th>Break Minutes</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="admin-attendance-body">
+                      <tr><td colspan="8" class="empty-placeholder">No team history logs available.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
