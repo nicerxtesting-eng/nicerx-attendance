@@ -1204,19 +1204,27 @@ function renderDashboardUI() {
   }
 }
 
-// 1. Leave Balances Displays
+// 1. Leave Balances Displays (Fixed Annual Total, Approved Used, Remaining = Total - Used)
 function renderLeaveBalances() {
   const u = state.currentUser;
   
-  const elTotal = parseFloat(u.earnedLeavesAvailable || 0) + parseFloat(u.earnedLeavesUsed || 0);
-  DOM.balElAvail.textContent = elTotal.toFixed(1);
-  DOM.balElUsed.textContent = parseFloat(u.earnedLeavesUsed || 0).toFixed(1);
-  DOM.balElRem.textContent = parseFloat(u.earnedLeavesAvailable || 0).toFixed(1);
+  // Earned Leaves (EL): Fixed Annual Credit = 15.0
+  const elTotal = 15.0;
+  const elUsed = parseFloat(u.earnedLeavesUsed || 0);
+  const elRem = Math.max(0, elTotal - elUsed);
   
-  const slTotal = parseFloat(u.sickLeavesAvailable || 0) + parseFloat(u.sickLeavesUsed || 0);
+  DOM.balElAvail.textContent = elTotal.toFixed(1);
+  DOM.balElUsed.textContent = elUsed.toFixed(1);
+  DOM.balElRem.textContent = elRem.toFixed(1);
+  
+  // Sick Leaves (SL): Fixed Annual Credit = 6.5
+  const slTotal = 6.5;
+  const slUsed = parseFloat(u.sickLeavesUsed || 0);
+  const slRem = Math.max(0, slTotal - slUsed);
+  
   DOM.balSlAvail.textContent = slTotal.toFixed(1);
-  DOM.balSlUsed.textContent = parseFloat(u.sickLeavesUsed || 0).toFixed(1);
-  DOM.balSlRem.textContent = parseFloat(u.sickLeavesAvailable || 0).toFixed(1);
+  DOM.balSlUsed.textContent = slUsed.toFixed(1);
+  DOM.balSlRem.textContent = slRem.toFixed(1);
 }
 
 // 2. Break Allocation Status & Warning Checks
@@ -1317,23 +1325,50 @@ function renderReminders() {
   const today = getESTTime();
   const currentMonth = today.getMonth();
   const currentDate = today.getDate();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   
   const upcomingBirthdays = users
+    .filter(u => u.birthday)
     .map(u => {
-      const bdate = new Date(u.birthday);
-      let nextBday = new Date(today.getFullYear(), bdate.getMonth(), bdate.getDate());
-      if (nextBday < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
-        nextBday.setFullYear(today.getFullYear() + 1);
+      let bMonth, bDay;
+      const parts = u.birthday.split('-');
+      if (parts.length === 3) {
+        bMonth = parseInt(parts[1], 10) - 1;
+        bDay = parseInt(parts[2], 10);
+      } else {
+        const bdate = new Date(u.birthday);
+        bMonth = bdate.getMonth();
+        bDay = bdate.getDate();
       }
-      return { ...u, nextBday, bdate };
+      
+      let nextBday = new Date(today.getFullYear(), bMonth, bDay);
+      if (nextBday < todayStart) {
+        nextBday = new Date(today.getFullYear() + 1, bMonth, bDay);
+      }
+      
+      const diffMs = nextBday - todayStart;
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      const isCurrentMonth = (bMonth === currentMonth);
+      const isWithinNext20Days = (diffDays >= 0 && diffDays <= 20);
+      
+      return {
+        ...u,
+        bMonth,
+        bDay,
+        nextBday,
+        diffDays,
+        isValidForDisplay: isCurrentMonth || isWithinNext20Days
+      };
     })
+    .filter(u => u.isValidForDisplay)
     .sort((a, b) => a.nextBday - b.nextBday);
     
   if (upcomingBirthdays.length === 0) {
-    bList.innerHTML = `<li class="empty-list-placeholder">No birthdays available.</li>`;
+    bList.innerHTML = `<li class="empty-list-placeholder">No birthdays in current month or next 20 days.</li>`;
   } else {
     upcomingBirthdays.forEach(u => {
-      const isToday = u.bdate.getMonth() === currentMonth && u.bdate.getDate() === currentDate;
+      const isToday = u.bMonth === currentMonth && u.bDay === currentDate;
       const li = document.createElement('li');
       
       if (isToday) {
