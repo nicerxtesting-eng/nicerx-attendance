@@ -560,7 +560,13 @@ const DOM = {
   bestAttHalf: document.getElementById('best-att-half'),
   bestAttYear: document.getElementById('best-att-year'),
   bestPunctualMonth: document.getElementById('best-punctual-month'),
+  bestPunctualQuarter: document.getElementById('best-punctual-quarter'),
+  bestPunctualHalf: document.getElementById('best-punctual-half'),
+  bestPunctualYear: document.getElementById('best-punctual-year'),
   bestBreaksMonth: document.getElementById('best-breaks-month'),
+  bestBreaksQuarter: document.getElementById('best-breaks-quarter'),
+  bestBreaksHalf: document.getElementById('best-breaks-half'),
+  bestBreaksYear: document.getElementById('best-breaks-year'),
   
   // Histories
   attendanceHistoryBody: document.getElementById('attendance-history-body'),
@@ -1594,33 +1600,27 @@ function calculateSummaryBoard() {
   const today = getESTTime();
   const currentMonth = today.getMonth(); // 0-indexed
   const currentYear = today.getFullYear();
+  const currentQuarter = Math.floor(currentMonth / 3);
+  const currentHalf = Math.floor(currentMonth / 6);
   
-  // Helper to map email to Name
-  const getNameByEmail = (email) => {
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    return found ? found.name : email.split('@')[0];
-  };
-  
-  // Initialize stats metrics for active agents
+  // Initialize stats metrics for all agents
   const stats = {};
   users.forEach(u => {
     stats[u.email.toLowerCase()] = {
       name: u.name,
-      workedDaysMonth: 0,
-      absentDaysMonth: 0,
-      workedDaysQuarter: 0,
-      absentDaysQuarter: 0,
-      workedDaysHalf: 0,
-      absentDaysHalf: 0,
-      workedDaysYear: 0,
-      absentDaysYear: 0,
-      
-      lateLoginsMonth: 0,
-      exceededBreaksMonth: 0
+      // Worked & Absent
+      workedMonth: 0, absentMonth: 0,
+      workedQuarter: 0, absentQuarter: 0,
+      workedHalf: 0, absentHalf: 0,
+      workedYear: 0, absentYear: 0,
+      // Strict Tardy Logins (No 15m grace)
+      tardyMonth: 0, tardyQuarter: 0, tardyHalf: 0, tardyYear: 0,
+      // Exceeded Breaks
+      exceededMonth: 0, exceededQuarter: 0, exceededHalf: 0, exceededYear: 0
     };
   });
   
-  // 1. Process Attendance
+  // 1. Process Attendance Log Records
   attendance.forEach(att => {
     const email = att.email.toLowerCase();
     if (!stats[email]) return;
@@ -1630,42 +1630,56 @@ function calculateSummaryBoard() {
     
     const attMonth = attDate.getMonth();
     const attYear = attDate.getFullYear();
+    const attQuarter = Math.floor(attMonth / 3);
+    const attHalf = Math.floor(attMonth / 6);
     
     if (attYear === currentYear) {
-      const isLate = att.status === 'Late Login';
       const isAbsent = att.status === 'Absent' || att.status === 'LWP';
+      
+      // Check Strict Punctuality (No 15m grace allowance):
+      // Assigned Shift start: 8:30 AM EST (8.5h) or 10:00 AM EST (10.0h)
+      let isStrictTardy = (att.status === 'Late Login');
+      if (att.punchIn) {
+        const pDate = getESTTime(new Date(att.punchIn));
+        const pHour = pDate.getHours();
+        const pMin = pDate.getMinutes();
+        const pDecimal = pHour + (pMin / 60);
+        const shiftSlot = att.shiftSlot || "8:30 AM EST";
+        const startDecimal = shiftSlot === "10:00 AM EST" ? 10.0 : 8.5;
+        if (pDecimal > (startDecimal + 0.001)) {
+          isStrictTardy = true;
+        }
+      }
       
       // Monthly checks
       if (attMonth === currentMonth) {
-        if (isAbsent) stats[email].absentDaysMonth++;
-        else stats[email].workedDaysMonth++;
-        
-        if (isLate) stats[email].lateLoginsMonth++;
+        if (isAbsent) stats[email].absentMonth++;
+        else stats[email].workedMonth++;
+        if (isStrictTardy) stats[email].tardyMonth++;
       }
       
-      // Quarterly checks (Q1: Jan-Mar (0-2), Q2: Apr-Jun (3-5), Q3: Jul-Sep (6-8), Q4: Oct-Dec (9-11))
-      const currentQuarter = Math.floor(currentMonth / 3);
-      const attQuarter = Math.floor(attMonth / 3);
+      // Quarterly checks
       if (attQuarter === currentQuarter) {
-        if (isAbsent) stats[email].absentDaysQuarter++;
-        else stats[email].workedDaysQuarter++;
+        if (isAbsent) stats[email].absentQuarter++;
+        else stats[email].workedQuarter++;
+        if (isStrictTardy) stats[email].tardyQuarter++;
       }
       
-      // Half Yearly checks (H1: Jan-Jun (0-5), H2: Jul-Dec (6-11))
-      const currentHalf = Math.floor(currentMonth / 6);
-      const attHalf = Math.floor(attMonth / 6);
+      // Half Yearly checks
       if (attHalf === currentHalf) {
-        if (isAbsent) stats[email].absentDaysHalf++;
-        else stats[email].workedDaysHalf++;
+        if (isAbsent) stats[email].absentHalf++;
+        else stats[email].workedHalf++;
+        if (isStrictTardy) stats[email].tardyHalf++;
       }
       
-      // Yearly
-      if (isAbsent) stats[email].absentDaysYear++;
-      else stats[email].workedDaysYear++;
+      // Yearly checks
+      if (isAbsent) stats[email].absentYear++;
+      else stats[email].workedYear++;
+      if (isStrictTardy) stats[email].tardyYear++;
     }
   });
   
-  // 2. Process Exceeded Breaks Today/Month
+  // 2. Process Exceeded Breaks Records
   breaks.forEach(b => {
     const email = b.email.toLowerCase();
     if (!stats[email]) return;
@@ -1673,7 +1687,12 @@ function calculateSummaryBoard() {
     const bDate = new Date(b.date);
     if (isNaN(bDate.getTime())) return;
     
-    if (bDate.getFullYear() === currentYear && bDate.getMonth() === currentMonth) {
+    const bYear = bDate.getFullYear();
+    const bMonth = bDate.getMonth();
+    const bQuarter = Math.floor(bMonth / 3);
+    const bHalf = Math.floor(bMonth / 6);
+    
+    if (bYear === currentYear) {
       const dur = parseFloat(b.breakDurationMinutes || 0);
       let exceeded = false;
       if (b.breakType === 'Tea Break 1' && dur > 15) exceeded = true;
@@ -1682,53 +1701,85 @@ function calculateSummaryBoard() {
       else if (b.breakType === 'Bio Break' && dur > 5) exceeded = true;
       
       if (exceeded) {
-        stats[email].exceededBreaksMonth++;
+        if (bMonth === currentMonth) stats[email].exceededMonth++;
+        if (bQuarter === currentQuarter) stats[email].exceededQuarter++;
+        if (bHalf === currentHalf) stats[email].exceededHalf++;
+        stats[email].exceededYear++;
       }
     }
   });
   
-  // Helper to extract best agent (100% compliance criteria)
-  const getBestAgent = (filterFn, scoreFn) => {
-    let bestAgent = "No Data";
-    let maxScore = -1;
-    
-    Object.keys(stats).forEach(email => {
-      const userStat = stats[email];
-      if (filterFn(userStat)) {
-        const score = scoreFn(userStat);
-        if (score > maxScore && score > 0) {
-          maxScore = score;
-          bestAgent = userStat.name;
-        }
+  // Helper to extract 100% Attendance Winner
+  const getAttendanceLeader = (workedKey, absentKey) => {
+    let leader = "No data";
+    let maxWorked = -1;
+    Object.keys(stats).forEach(e => {
+      const s = stats[e];
+      if (s[absentKey] === 0 && s[workedKey] > maxWorked && s[workedKey] > 0) {
+        maxWorked = s[workedKey];
+        leader = s.name;
       }
     });
-    return bestAgent;
+    return leader;
   };
   
-  // Calculations
-  // A. Best Attendance Month (workedDays > 0, absentDays == 0)
-  const bestAttM = getBestAgent(u => u.absentDaysMonth === 0, u => u.workedDaysMonth);
-  // B. Best Attendance Quarter
-  const bestAttQ = getBestAgent(u => u.absentDaysQuarter === 0, u => u.workedDaysQuarter);
-  // C. Best Attendance Half Yearly
-  const bestAttH = getBestAgent(u => u.absentDaysHalf === 0, u => u.workedDaysHalf);
-  // D. Best Attendance Yearly
-  const bestAttY = getBestAgent(u => u.absentDaysYear === 0, u => u.workedDaysYear);
+  // Helper to resolve Punctuality Leader or >3 Tardy Violations
+  const getPunctualityLeader = (tardyKey, workedKey) => {
+    // Check if any agents exceed 3 tardy logins
+    const violators = Object.values(stats).filter(s => s[tardyKey] > 3);
+    if (violators.length > 0) {
+      return violators.map(v => `${v.name} (${v[tardyKey]} Late)`).join(', ');
+    }
+    
+    // Otherwise return agent with 0 tardies and most worked days
+    let leader = "No data";
+    let maxWorked = -1;
+    Object.values(stats).forEach(s => {
+      if (s[tardyKey] === 0 && s[workedKey] > maxWorked && s[workedKey] > 0) {
+        maxWorked = s[workedKey];
+        leader = s.name;
+      }
+    });
+    return leader;
+  };
   
-  // E. Best Agent Punctuality (0 late logins, and worked most days in current month)
-  const bestPunct = getBestAgent(u => u.lateLoginsMonth === 0 && u.absentDaysMonth === 0, u => u.workedDaysMonth);
+  // Helper to resolve Break Compliance Leader or >3 Exceeded Breaks Violations
+  const getComplianceLeader = (exceededKey, workedKey) => {
+    // Check if any agents exceed 3 break limit overshoots
+    const violators = Object.values(stats).filter(s => s[exceededKey] > 3);
+    if (violators.length > 0) {
+      return violators.map(v => `${v.name} (${v[exceededKey]} Exceeded)`).join(', ');
+    }
+    
+    // Otherwise return agent with 0 break overshoots and most worked days
+    let leader = "No data";
+    let maxWorked = -1;
+    Object.values(stats).forEach(s => {
+      if (s[exceededKey] === 0 && s[workedKey] > maxWorked && s[workedKey] > 0) {
+        maxWorked = s[workedKey];
+        leader = s.name;
+      }
+    });
+    return leader;
+  };
   
-  // F. Best Agent Breaks Compliance (0 exceeded breaks, and worked most days in current month)
-  const bestBrks = getBestAgent(u => u.exceededBreaksMonth === 0 && u.absentDaysMonth === 0, u => u.workedDaysMonth);
+  // Write 100% Attendance Compliance to DOM
+  DOM.bestAttMonth.textContent = getAttendanceLeader('workedMonth', 'absentMonth');
+  DOM.bestAttQuarter.textContent = getAttendanceLeader('workedQuarter', 'absentQuarter');
+  DOM.bestAttHalf.textContent = getAttendanceLeader('workedHalf', 'absentHalf');
+  DOM.bestAttYear.textContent = getAttendanceLeader('workedYear', 'absentYear');
   
-  // Write to DOM
-  DOM.bestAttMonth.textContent = bestAttM;
-  DOM.bestAttQuarter.textContent = bestAttQ;
-  DOM.bestAttHalf.textContent = bestAttH;
-  DOM.bestAttYear.textContent = bestAttY;
+  // Write Punctuality (Strict On-Time) to DOM across 4 periods
+  DOM.bestPunctualMonth.textContent = getPunctualityLeader('tardyMonth', 'workedMonth');
+  if (DOM.bestPunctualQuarter) DOM.bestPunctualQuarter.textContent = getPunctualityLeader('tardyQuarter', 'workedQuarter');
+  if (DOM.bestPunctualHalf) DOM.bestPunctualHalf.textContent = getPunctualityLeader('tardyHalf', 'workedHalf');
+  if (DOM.bestPunctualYear) DOM.bestPunctualYear.textContent = getPunctualityLeader('tardyYear', 'workedYear');
   
-  DOM.bestPunctualMonth.textContent = bestPunct;
-  DOM.bestBreaksMonth.textContent = bestBrks;
+  // Write Break Compliance to DOM across 4 periods
+  DOM.bestBreaksMonth.textContent = getComplianceLeader('exceededMonth', 'workedMonth');
+  if (DOM.bestBreaksQuarter) DOM.bestBreaksQuarter.textContent = getComplianceLeader('exceededQuarter', 'workedQuarter');
+  if (DOM.bestBreaksHalf) DOM.bestBreaksHalf.textContent = getComplianceLeader('exceededHalf', 'workedHalf');
+  if (DOM.bestBreaksYear) DOM.bestBreaksYear.textContent = getComplianceLeader('exceededYear', 'workedYear');
 }
 
 // --- Shift Punch In/Out Controllers ---
