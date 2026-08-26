@@ -521,6 +521,7 @@ const DOM = {
   userShiftSlot: document.getElementById('user-shift-slot'),
   shiftTimer: document.getElementById('shift-timer'),
   breakTimer: document.getElementById('break-timer'),
+  totalShiftTimer: document.getElementById('total-shift-timer'),
   btnPunch: document.getElementById('btn-punch'),
   btnPunchText: document.getElementById('btn-punch-text'),
   
@@ -1038,17 +1039,37 @@ function restoreShiftStateAndTimers() {
 // Calculate the break items from logs today
 function calculateCompletedBreaksToday(userBreaks) {
   // Reset
-  state.todayBreaks = { tea1: 0, dinner: 0, tea2: 0, bioCount: 0, bioTime: 0 };
+  state.todayBreaks = { 
+    tea1: 0, 
+    dinner: 0, 
+    tea2: 0, 
+    bioCount: 0, 
+    bioTime: 0,
+    tea1Used: false,
+    dinnerUsed: false,
+    tea2Used: false
+  };
   
   userBreaks.forEach(b => {
-    if (b.breakEnd !== '') {
-      const durMins = (new Date(b.breakEnd) - new Date(b.breakStart)) / 60000;
-      if (b.breakType === 'Tea Break 1') state.todayBreaks.tea1 += durMins;
-      else if (b.breakType === 'Dinner Break') state.todayBreaks.dinner += durMins;
-      else if (b.breakType === 'Tea Break 2') state.todayBreaks.tea2 += durMins;
-      else if (b.breakType === 'Bio Break') {
-        state.todayBreaks.bioCount++;
-        state.todayBreaks.bioTime += durMins;
+    if (b.breakType === 'Tea Break 1') {
+      state.todayBreaks.tea1Used = true;
+      if (b.breakEnd !== '') {
+        state.todayBreaks.tea1 += (new Date(b.breakEnd) - new Date(b.breakStart)) / 60000;
+      }
+    } else if (b.breakType === 'Dinner Break') {
+      state.todayBreaks.dinnerUsed = true;
+      if (b.breakEnd !== '') {
+        state.todayBreaks.dinner += (new Date(b.breakEnd) - new Date(b.breakStart)) / 60000;
+      }
+    } else if (b.breakType === 'Tea Break 2') {
+      state.todayBreaks.tea2Used = true;
+      if (b.breakEnd !== '') {
+        state.todayBreaks.tea2 += (new Date(b.breakEnd) - new Date(b.breakStart)) / 60000;
+      }
+    } else if (b.breakType === 'Bio Break') {
+      state.todayBreaks.bioCount++;
+      if (b.breakEnd !== '') {
+        state.todayBreaks.bioTime += (new Date(b.breakEnd) - new Date(b.breakStart)) / 60000;
       }
     }
   });
@@ -1076,6 +1097,7 @@ function updateDomClocks(now = new Date()) {
 function startActiveTimers() {
   stopActiveTimers();
   workTimerAlertFired = false;
+  let closingReminderFired = false;
   
   state.activeTimersInterval = setInterval(() => {
     const now = new Date();
@@ -1083,17 +1105,38 @@ function startActiveTimers() {
     // 1. Update Dual Clocks (IST and EST) in all pages
     updateDomClocks(now);
     
-    // 2. Automate closing time check: Force logout at 6:00 PM EST
+    // 2. Shift End Closing Reminders & 1h Grace Window
     const estNow = getESTTime(now);
     const estHours = estNow.getHours();
-    if (estHours >= 18 && (state.shiftState === 'working' || state.shiftState === 'on_break')) {
-      handleForceLogoutClosingTime();
-      return;
+    const estMins = estNow.getMinutes();
+    const estDecimalHours = estHours + (estMins / 60);
+    
+    const userSlot = state.currentUser ? (state.currentUser.shiftSlot || "8:30 AM EST") : "8:30 AM EST";
+    // Shift 1 (8:30 AM EST): ends at 16:30 (4:30 PM EST). 1h grace until 17:30 (5:30 PM EST).
+    // Shift 2 (10:00 AM EST): ends at 18:00 (6:00 PM EST). 1h grace until 19:00 (7:00 PM EST).
+    const shiftEndHour = userSlot === "10:00 AM EST" ? 18.0 : 16.5;
+    const forceLogoutHour = shiftEndHour + 1.0; // Extra 1 hour post-shift
+    
+    if (state.shiftState === 'working' || state.shiftState === 'on_break') {
+      if (estDecimalHours >= shiftEndHour && !closingReminderFired) {
+        closingReminderFired = true;
+        showNotification("Our Company has closed for the day. Please wrap up and Logout in next few minutes. Thanks.", "warning");
+      }
+      
+      if (estDecimalHours >= forceLogoutHour) {
+        handleForceLogoutClosingTime();
+        return;
+      }
     }
     
     // 3. Update shift indicators
     if (state.punchInTime) {
       const elapsedShiftMs = now - state.punchInTime;
+      
+      // Update Total Shift Time (Active Work Time + Break Time Used)
+      if (DOM.totalShiftTimer) {
+        DOM.totalShiftTimer.textContent = formatDurationMs(elapsedShiftMs);
+      }
       
       // Update break accessibility rules (unlocked only after 2 hours = 7,200,000 ms)
       if (elapsedShiftMs >= 7200000) {
@@ -1113,8 +1156,7 @@ function startActiveTimers() {
         const workedHours = workedMs / 3600000;
         if (workedHours >= 8.0 && !workTimerAlertFired) {
           workTimerAlertFired = true;
-          showNotification("⚠️ 8 hours shift completed! Please Logout for the Day.", "warning");
-          alert("NiceRx Attendance Notice:\nYou have completed 8 hours of clocked shift duration. Please Logout for the Day.");
+          showNotification("⚠️ Our Company has closed for the day. Please wrap up and Logout in next few minutes. Thanks.", "warning");
         }
       }
       
@@ -1256,6 +1298,34 @@ function renderBreakStatusList() {
   DOM.usedBio.textContent = `Count: ${tb.bioCount}/2 (${Math.round(tb.bioTime)}m)`;
   if (tb.bioCount > 2 || tb.bioTime > 10) DOM.usedBio.className = "break-used-badge text-exceeded"; // Max 5m each, so 10m total
   else DOM.usedBio.className = "break-used-badge";
+  
+  // Disable already utilized break options in dropdown
+  updateBreakDropdownOptions();
+}
+
+function updateBreakDropdownOptions() {
+  const sel = DOM.breakTypeSelect;
+  if (!sel) return;
+  const tb = state.todayBreaks || {};
+  
+  Array.from(sel.options).forEach(opt => {
+    if (opt.value === 'Tea Break 1') {
+      opt.disabled = !!tb.tea1Used;
+      opt.text = tb.tea1Used ? 'Tea Break 1 (Max 15m) - Already Utilized' : 'Tea Break 1 (Max 15m)';
+    } else if (opt.value === 'Dinner Break') {
+      opt.disabled = !!tb.dinnerUsed;
+      opt.text = tb.dinnerUsed ? 'Dinner Break (Max 30m) - Already Utilized' : 'Dinner Break (Max 30m)';
+    } else if (opt.value === 'Tea Break 2') {
+      opt.disabled = !!tb.tea2Used;
+      opt.text = tb.tea2Used ? 'Tea Break 2 (Max 15m) - Already Utilized' : 'Tea Break 2 (Max 15m)';
+    } else if (opt.value === 'Bio Break') {
+      const isMax = (tb.bioCount || 0) >= 2;
+      opt.disabled = isMax;
+      opt.text = isMax 
+        ? 'Bio Break (Max 2, 5m each) - Already Utilized (2/2)' 
+        : `Bio Break (Max 2, 5m each) (${tb.bioCount || 0}/2 used)`;
+    }
+  });
 }
 
 // 3. User Attendance list
@@ -1676,18 +1746,27 @@ async function handlePunchAction() {
       if (!confirmWeekend) return;
     }
     
-    // Calculate Late Login Status
+    // Calculate Early Punch In & Late Login Status
     const estHours = estNow.getHours();
     const estMins = estNow.getMinutes();
+    const estDecimal = estHours + (estMins / 60);
     let punchStatus = "Present";
     
     if (state.currentUser.shiftSlot === "8:30 AM EST") {
-      // 8:30 + 15m grace = 8:45 AM limit
+      // Allow punch in up to 1h early (starting at 7:30 AM EST = 7.5h)
+      if (estDecimal < 7.5) {
+        showNotification("Notice: Punch In is permitted up to 1 hour before your shift (7:30 AM EST).", "warning");
+      }
+      // 8:30 + 15m grace = 8:45 AM (8.75h) limit
       if (estHours > 8 || (estHours === 8 && estMins > 45)) {
         punchStatus = "Late Login";
       }
     } else if (state.currentUser.shiftSlot === "10:00 AM EST") {
-      // 10:00 + 15m grace = 10:15 AM limit
+      // Allow punch in up to 1h early (starting at 9:00 AM EST = 9.0h)
+      if (estDecimal < 9.0) {
+        showNotification("Notice: Punch In is permitted up to 1 hour before your shift (9:00 AM EST).", "warning");
+      }
+      // 10:00 + 15m grace = 10:15 AM (10.25h) limit
       if (estHours > 10 || (estHours === 10 && estMins > 15)) {
         punchStatus = "Late Login";
       }
@@ -1763,10 +1842,10 @@ async function handlePunchAction() {
   updateShiftControlUI();
 }
 
-function calculateTodayShiftStatus(workedHours) {
+function calculateTodayShiftStatus(workedHours, initialPunchStatus = "Present") {
   if (workedHours < 4.0) return "Absent";
-  if (workedHours < 7.9) return "Half Day"; // Less than 8 hours shift is Half Day per specs
-  return "Present"; // Logged in full 8 hours
+  if (workedHours < 7.0) return "Half Day";
+  return initialPunchStatus === "Late Login" ? "Late Login" : "Present";
 }
 
 // Break manager triggers
@@ -1777,10 +1856,16 @@ async function handleBreakAction() {
   
   if (state.shiftState === 'working') {
     // START BREAK
+    const tb = state.todayBreaks || {};
+    let isAlreadyUtilized = false;
     
-    // Check Bio Breaks limit: Max 2 breaks, 5 mins each
-    if (selectedBreakType === 'Bio Break' && state.todayBreaks.bioCount >= 2) {
-      showNotification("Policy Block: Maximum of 2 Bio Breaks allowed per shift.", "error");
+    if (selectedBreakType === 'Tea Break 1' && tb.tea1Used) isAlreadyUtilized = true;
+    else if (selectedBreakType === 'Dinner Break' && tb.dinnerUsed) isAlreadyUtilized = true;
+    else if (selectedBreakType === 'Tea Break 2' && tb.tea2Used) isAlreadyUtilized = true;
+    else if (selectedBreakType === 'Bio Break' && (tb.bioCount || 0) >= 2) isAlreadyUtilized = true;
+    
+    if (isAlreadyUtilized) {
+      showNotification("You have already utilized this Break Type", "warning");
       return;
     }
     
@@ -2086,8 +2171,24 @@ function formatDurationMs(ms) {
 
 function formatDate(dateString) {
   if (!dateString) return '-';
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return dateString;
+  const str = dateString.toString().trim();
+  
+  // Directly parse YYYY-MM-DD to avoid UTC vs Local timezone shifts in Safari/Firefox/Chrome/Edge
+  if (typeof str === 'string' && str.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const parts = str.split('T')[0].split('-');
+    if (parts.length === 3) {
+      const y = parts[0];
+      const m = parseInt(parts[1], 10) - 1;
+      const d = parseInt(parts[2], 10);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      if (m >= 0 && m < 12) {
+        return `${months[m]} ${d}, ${y}`;
+      }
+    }
+  }
+  
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return str;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -2198,4 +2299,3 @@ function getAgentNameByEmail(email) {
   const found = state.dashboardData.users.find(u => u.email.toLowerCase() === email.toLowerCase());
   return found ? found.name : email.split('@')[0];
 }
-
