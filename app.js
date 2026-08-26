@@ -969,7 +969,8 @@ async function loadDashboardData() {
       breaks: res.breaks || [],
       leaves: res.leaves || [],
       holidays: res.holidays || [],
-      users: res.users || []
+      users: res.users || [],
+      summaryBoard: res.summaryBoard || null
     };
     
     if (res.user) {
@@ -1589,6 +1590,26 @@ window.updateLeaveRequest = async (rowId, newStatus) => {
 
 // --- Leaderboard Compliance Logic (Summary Board) ---
 function calculateSummaryBoard() {
+  // If server provided summaryBoard, use server metrics for 100% role parity
+  if (state.dashboardData && state.dashboardData.summaryBoard) {
+    const sb = state.dashboardData.summaryBoard;
+    DOM.bestAttMonth.textContent = sb.bestAttMonth || "No data";
+    DOM.bestAttQuarter.textContent = sb.bestAttQuarter || "No data";
+    DOM.bestAttHalf.textContent = sb.bestAttHalf || "No data";
+    DOM.bestAttYear.textContent = sb.bestAttYear || "No data";
+    
+    if (DOM.bestPunctualMonth) DOM.bestPunctualMonth.textContent = sb.bestPunctualMonth || "No data";
+    if (DOM.bestPunctualQuarter) DOM.bestPunctualQuarter.textContent = sb.bestPunctualQuarter || "No data";
+    if (DOM.bestPunctualHalf) DOM.bestPunctualHalf.textContent = sb.bestPunctualHalf || "No data";
+    if (DOM.bestPunctualYear) DOM.bestPunctualYear.textContent = sb.bestPunctualYear || "No data";
+    
+    if (DOM.bestBreaksMonth) DOM.bestBreaksMonth.textContent = sb.bestBreaksMonth || "No data";
+    if (DOM.bestBreaksQuarter) DOM.bestBreaksQuarter.textContent = sb.bestBreaksQuarter || "No data";
+    if (DOM.bestBreaksHalf) DOM.bestBreaksHalf.textContent = sb.bestBreaksHalf || "No data";
+    if (DOM.bestBreaksYear) DOM.bestBreaksYear.textContent = sb.bestBreaksYear || "No data";
+    return;
+  }
+
   const attendance = state.dashboardData.attendance;
   const breaks = state.dashboardData.breaks;
   const users = state.dashboardData.users;
