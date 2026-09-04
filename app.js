@@ -1475,35 +1475,22 @@ function renderReminders() {
     });
   }
   
-  // US client holidays
+  // US client holidays (Raw Date String Matching)
   const hList = DOM.holidaysList;
   hList.innerHTML = '';
   
-  const holidays = state.dashboardData.holidays
-    .map(h => ({ ...h, parsedDate: new Date(h.date) }))
-    .filter(h => h.parsedDate >= new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1))
-    .sort((a, b) => a.parsedDate - b.parsedDate);
-    
+  const holidays = state.dashboardData.holidays || [];
   if (holidays.length === 0) {
     hList.innerHTML = `<li class="empty-list-placeholder">No client holidays.</li>`;
   } else {
     holidays.forEach(h => {
-      const formattedDate = h.parsedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-      const isToday = h.parsedDate.toDateString() === today.toDateString();
+      const formattedDate = formatDate(h.date);
       const li = document.createElement('li');
       
-      if (isToday) {
-        li.className = 'today-highlight';
-        li.innerHTML = `
-          <span>🌴 <strong>${h.name}</strong> <span class="badge badge-offline" style="font-size:0.6rem; padding: 2px 6px;">Client Holiday</span></span>
-          <span class="reminder-date">TODAY</span>
-        `;
-      } else {
-        li.innerHTML = `
-          <span><i class="fa-solid fa-umbrella-beach text-muted" style="margin-right:8px;"></i>${h.name}</span>
-          <span class="reminder-date">${formattedDate}</span>
-        `;
-      }
+      li.innerHTML = `
+        <span>🌴 <strong>${h.name}</strong> <span class="badge badge-offline" style="font-size:0.6rem; padding: 2px 6px;">Client Holiday</span></span>
+        <span class="reminder-date text-teal">${formattedDate}</span>
+      `;
       hList.appendChild(li);
     });
   }
@@ -1588,6 +1575,37 @@ window.updateLeaveRequest = async (rowId, newStatus) => {
   }
 };
 
+function extractTimeDecimalClient(val) {
+  if (!val) return -1;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return -1;
+    return val.getHours() + (val.getMinutes() / 60);
+  }
+  const str = val.toString().trim();
+  if (!str) return -1;
+  
+  const isoMatch = str.match(/T(\d{2}):(\d{2})/i) || str.match(/\s(\d{2}):(\d{2})/);
+  if (isoMatch) {
+    return parseInt(isoMatch[1], 10) + (parseInt(isoMatch[2], 10) / 60);
+  }
+  
+  const ampmMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+  if (ampmMatch) {
+    let h = parseInt(ampmMatch[1], 10);
+    const m = parseInt(ampmMatch[2], 10);
+    const mer = ampmMatch[3] ? ampmMatch[3].toUpperCase() : null;
+    if (mer === "PM" && h < 12) h += 12;
+    if (mer === "AM" && h === 12) h = 0;
+    return h + (m / 60);
+  }
+  
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.getHours() + (d.getMinutes() / 60);
+  }
+  return -1;
+}
+
 // --- Leaderboard Compliance Logic (Summary Board) ---
 function calculateSummaryBoard() {
   // If server provided summaryBoard, use server metrics for 100% role parity
@@ -1657,19 +1675,19 @@ function calculateSummaryBoard() {
     if (attYear === currentYear) {
       const isAbsent = att.status === 'Absent' || att.status === 'LWP';
       
-      // Check Strict Punctuality (No 15m grace allowance):
+      // Check Strict Punctuality from PunchIn column (No 15m grace allowance):
       // Assigned Shift start: 8:30 AM EST (8.5h) or 10:00 AM EST (10.0h)
-      let isStrictTardy = (att.status === 'Late Login');
-      if (att.punchIn) {
-        const pDate = getESTTime(new Date(att.punchIn));
-        const pHour = pDate.getHours();
-        const pMin = pDate.getMinutes();
-        const pDecimal = pHour + (pMin / 60);
-        const shiftSlot = att.shiftSlot || "8:30 AM EST";
-        const startDecimal = shiftSlot === "10:00 AM EST" ? 10.0 : 8.5;
+      let isStrictTardy = false;
+      const pDecimal = extractTimeDecimalClient(att.punchIn);
+      const shiftSlot = att.shiftSlot || "8:30 AM EST";
+      const startDecimal = shiftSlot === "10:00 AM EST" ? 10.0 : 8.5;
+      
+      if (pDecimal >= 0) {
         if (pDecimal > (startDecimal + 0.001)) {
           isStrictTardy = true;
         }
+      } else if (att.status === 'Late Login') {
+        isStrictTardy = true;
       }
       
       // Monthly checks
